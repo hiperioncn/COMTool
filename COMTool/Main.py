@@ -43,6 +43,9 @@ class MainWindow(QMainWindow):
     isHideFunctinal = True
     app = None
     isWaveOpen = False
+    # Add by Hiperion
+    # 数据显示框是否为空
+    isReceiveAreaEmpty = True
 
     def __init__(self,app):
         super().__init__()
@@ -131,6 +134,7 @@ class MainWindow(QMainWindow):
         self.receiveArea = QTextEdit()
         self.sendArea = QTextEdit()
         self.clearReceiveButtion = QPushButton(parameters.strClearReceive)
+        self.saveReceiveButtion = QPushButton(parameters.strSaveReceive)
         self.sendButtion = QPushButton(parameters.strSend)
         self.sendHistory = ComboBox()
         sendWidget = QWidget()
@@ -138,6 +142,7 @@ class MainWindow(QMainWindow):
         sendWidget.setLayout(sendAreaWidgetsLayout)
         buttonLayout = QVBoxLayout()
         buttonLayout.addWidget(self.clearReceiveButtion)
+        buttonLayout.addWidget(self.saveReceiveButtion)
         buttonLayout.addStretch(1)
         buttonLayout.addWidget(self.sendButtion)
         sendAreaWidgetsLayout.addWidget(self.sendArea)
@@ -276,7 +281,7 @@ class MainWindow(QMainWindow):
 
         self.resize(800, 500)
         self.MoveToCenter()
-        self.setWindowTitle(parameters.appName+" V"+str(helpAbout.versionMajor)+"."+str(helpAbout.versionMinor))
+        self.setWindowTitle(parameters.appName+" V"+str(helpAbout.versionMajor)+"."+str(helpAbout.versionMinor)+"."+str(helpAbout.versionDev)+" "+str(helpAbout.poweredBy))
         icon = QIcon()
         print("icon path:"+self.DataPath+"/"+parameters.appIcon)
         icon.addPixmap(QPixmap(self.DataPath+"/"+parameters.appIcon), QIcon.Normal, QIcon.Off)
@@ -291,6 +296,8 @@ class MainWindow(QMainWindow):
         self.sendButtion.clicked.connect(self.sendData)
         self.receiveUpdateSignal.connect(self.updateReceivedDataDisplay)
         self.clearReceiveButtion.clicked.connect(self.clearReceiveBuffer)
+        self.saveReceiveButtion.clicked.connect(self.saveReceiveBuffer)
+
         self.serialPortCombobox.clicked.connect(self.portComboboxClicked)
         self.sendSettingsHex.clicked.connect(self.onSendSettingsHexClicked)
         self.sendSettingsAscii.clicked.connect(self.onSendSettingsAsciiClicked)
@@ -349,6 +356,10 @@ class MainWindow(QMainWindow):
                     self.com.open()
                     # print("open success")
                     # print(self.com)
+                    # 打开串口时，判断数据接收框内容是否为空
+                    if self.receiveArea.toPlainText().strip() == "":
+                        self.isReceiveAreaEmpty = True
+                        print("Received Area is empty")
                     self.setDisableSettingsSignal.emit(True)
                     self.receiveProcess = threading.Thread(target=self.receiveData)
                     self.receiveProcess.setDaemon(True)
@@ -489,12 +500,35 @@ class MainWindow(QMainWindow):
                 break
             # time.sleep(0.009)
 
-    def updateReceivedDataDisplay(self,str):
+    def updateReceivedDataDisplay111(self,str):
         if str != "":
             curScrollValue = self.receiveArea.verticalScrollBar().value()
             self.receiveArea.moveCursor(QTextCursor.End)
             endScrollValue = self.receiveArea.verticalScrollBar().value()
             self.receiveArea.insertPlainText(str)
+            if curScrollValue < endScrollValue:
+                self.receiveArea.verticalScrollBar().setValue(curScrollValue)
+            else:
+                self.receiveArea.moveCursor(QTextCursor.End)
+        self.statusBarSendCount.setText("%s(bytes):%d" %(parameters.strSend ,self.sendCount))
+        self.statusBarReceiveCount.setText("%s(bytes):%d" %(parameters.strReceive ,self.receiveCount))
+
+    # Add by Hiperion 2020-04-13
+    def updateReceivedDataDisplay(self,str):
+        if str != "":
+            # str_now = "[" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()) + "] "
+            str_now = "[" + time.strftime('%H:%M:%S', time.localtime()) + "] "
+            # print("原始："+str)
+            if self.isReceiveAreaEmpty :
+                str = str_now + str
+            else:
+                str = str.replace("\n","\n"+str_now)
+            # print("加时：" + str)
+            curScrollValue = self.receiveArea.verticalScrollBar().value()
+            self.receiveArea.moveCursor(QTextCursor.End)
+            endScrollValue = self.receiveArea.verticalScrollBar().value()
+            self.receiveArea.insertPlainText(str)
+            self.isReceiveAreaEmpty = False
             if curScrollValue < endScrollValue:
                 self.receiveArea.verticalScrollBar().setValue(curScrollValue)
             else:
@@ -529,6 +563,20 @@ class MainWindow(QMainWindow):
         self.receiveCount = 0;
         self.sendCount = 0;
         self.receiveUpdateSignal.emit(None)
+
+    # Add by Hiperion 2020-04-13
+    def saveReceiveBuffer(self):
+        str_now = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())
+        save_path = (os.path.expanduser("~/Downloads")+"/%s.%s" % ("COM_"+str_now, "log"))
+        # if not os.path.exists(save_path):
+        #     os.makedirs(save_path)
+        with open(save_path, "w", encoding='utf-8') as f:
+            f.write(self.receiveArea.toPlainText())
+            f.close()
+            self.errorSignal.emit("Save to "+save_path)
+            # for chunk in self.receiveArea.toPlainText().iter_content(chunk_size=1024):
+            #     if chunk:
+            #         f.write(chunk)
 
     def MoveToCenter(self):
         qr = self.frameGeometry()
@@ -842,4 +890,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+    # str_now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    # print(str_now)
 

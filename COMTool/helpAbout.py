@@ -6,9 +6,10 @@ except ImportError:
 import os
 
 versionMajor = 1
-versionMinor = 7
-versionDev   = 9
-date = "2019.06.27"
+versionMinor = 8
+versionDev   = 0
+poweredBy = " Powered by BloomSky"
+date = "2020.04.13"
 
 def strAbout():
     pathDirList = sys.argv[0].replace("\\", "/").split("/")
